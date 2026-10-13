@@ -13,11 +13,10 @@ public class Card {
     public int getDenomination() {
         return denomination;
     }
+    public static void main(String[] args) {
+    Card card = new Card(4);
+    System.out.println(card.getDenomination());
+    }
 }
 
     
-
-
-
-
-}
