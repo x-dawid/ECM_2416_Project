@@ -1,0 +1,23 @@
+{
+  "java.project.sourcePaths": [
+    "card-game\\src"
+  ],
+  "java.project.referencedLibraries": [],
+  "java.configuration.runtimes": [
+    {
+      "name": "JavaSE-21",
+      "path": "C:\\Program Files\\Eclipse Adoptium\\jdk-21.0.12.101-hotspot",
+      "default": true
+    }
+  ],
+  "terminal.integrated.profiles.windows": {
+    "Coursework Java 21": {
+      "path": "cmd.exe",
+      "env": {
+        "JAVA_HOME": "C:\\Program Files\\Eclipse Adoptium\\jdk-21.0.12.101-hotspot",
+        "PATH": "C:\\Program Files\\Eclipse Adoptium\\jdk-21.0.12.101-hotspot\\bin;${env:PATH}"
+      }
+    }
+  },
+  "terminal.integrated.defaultProfile.windows": "Coursework Java 21"
+}
