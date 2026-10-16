@@ -1,19 +1,14 @@
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicBoolean;
 
-public class Player implements Runnable {
+public class Player {
     private final int playerNumber;
     private final List<Card> hand;
 
     private final CardDeck inputDeck;
     private final CardDeck outputDeck;
     private final Object gameLock;
-    private final CardGame game;
-    private final CountDownLatch initialChecks;
-    private final AtomicBoolean stopRequested;
 
     public Player(int playerNumber, List<Card> initialHand) {
         this(playerNumber, initialHand, null, null, new Object());
@@ -25,19 +20,6 @@ public class Player implements Runnable {
             CardDeck inputDeck,
             CardDeck outputDeck,
             Object gameLock) {
-        this(playerNumber, initialHand, inputDeck, outputDeck,
-                gameLock, null, null, null);
-    }
-
-    public Player(
-            int playerNumber,
-            List<Card> initialHand,
-            CardDeck inputDeck,
-            CardDeck outputDeck,
-            Object gameLock,
-            CardGame game,
-            CountDownLatch initialChecks,
-            AtomicBoolean stopRequested) {
 
         if (playerNumber <= 0) {
             throw new IllegalArgumentException(
@@ -72,9 +54,6 @@ public class Player implements Runnable {
         this.gameLock = Objects.requireNonNull(
             gameLock, "Game lock cannot be null"
         );
-        this.game = game;
-        this.initialChecks = initialChecks;
-        this.stopRequested = stopRequested;
     }
 
     public int getPlayerNumber() {
@@ -144,79 +123,5 @@ public class Player implements Runnable {
         throw new IllegalStateException(
             "No non-preferred card is available to discard"
         );
-    }
-
-    @Override
-    public void run() {
-        if (inputDeck == null || outputDeck == null || game == null
-                || initialChecks == null || stopRequested == null) {
-            throw new IllegalStateException(
-                "Runnable players need decks, game, initial checks and stop flag"
-            );
-        }
-
-        boolean initialCheckReported = false;
-        try {
-            synchronized (gameLock) {
-                if (!stopRequested.get() && hasWinningHand()) {
-                    announceWin();
-                }
-            }
-            initialChecks.countDown();
-            initialCheckReported = true;
-            initialChecks.await();
-
-            while (true) {
-                synchronized (gameLock) {
-                    while (!shouldStop() && inputDeck.isEmpty()) {
-                        gameLock.wait();
-                    }
-
-                    if (shouldStop()) {
-                        return;
-                    }
-
-                    if (Thread.currentThread().isInterrupted()) {
-                        throw new InterruptedException();
-                    }
-
-                    takeTurn();
-                    gameLock.notifyAll();
-
-                    if (hasWinningHand()) {
-                        announceWin();
-                    }
-                }
-
-                Thread.yield();
-            }
-        } catch (InterruptedException e) {
-            requestStop();
-            Thread.currentThread().interrupt();
-        } catch (RuntimeException e) {
-            requestStop();
-            throw e;
-        } finally {
-            if (!initialCheckReported) {
-                initialChecks.countDown();
-            }
-        }
-    }
-
-    private boolean shouldStop() {
-        return stopRequested.get() || game.getWinner() != 0;
-    }
-
-    private void announceWin() {
-        if (game.declareWinner(playerNumber)) {
-            System.out.println("player " + playerNumber + " wins");
-        }
-    }
-
-    private void requestStop() {
-        synchronized (gameLock) {
-            stopRequested.set(true);
-            gameLock.notifyAll();
-        }
     }
 }
