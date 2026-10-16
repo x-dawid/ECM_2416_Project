@@ -1,3 +1,4 @@
+import java.io.EOFException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -14,7 +15,9 @@ public class CardGame {
     private CardGame(int numberOfPlayers, List<Card> pack) {
         for (int i = 0; i < numberOfPlayers; i++) {
             decks.add(new CardDeck(i + 1, gameLock));
+        }
 
+        for (int i = 0; i < numberOfPlayers; i++) {
             List<Card> hand = new ArrayList<>();
 
             for (int round = 0; round < 4; round++) {
@@ -22,7 +25,13 @@ public class CardGame {
                 hand.add(pack.get(cardIndex));
             }
 
-            players.add(new Player(i + 1, hand));
+            players.add(new Player(
+                i + 1,
+                hand,
+                decks.get(i),
+                decks.get((i + 1) % numberOfPlayers),
+                gameLock
+            ));
         }
 
         int firstDeckCard = 4 * numberOfPlayers;
@@ -44,12 +53,18 @@ public class CardGame {
                 "Setup complete: " + game.players.size()
                 + " players and " + game.decks.size() + " decks."
             );
+        } catch (EOFException e) {
+            System.out.println("Input closed. Exiting.");
         }
     }
 
-    private static int readPlayerCount(Scanner scanner) {
+    private static int readPlayerCount(Scanner scanner) throws EOFException {
         while (true) {
             System.out.println("Please enter the number of players:");
+
+            if (!scanner.hasNextLine()) {
+                throw new EOFException();
+            }
 
             try {
                 int number = Integer.parseInt(
@@ -68,11 +83,15 @@ public class CardGame {
     }
 
     private static List<Card> requestPack(
-            Scanner scanner, int numberOfPlayers) {
+            Scanner scanner, int numberOfPlayers) throws EOFException {
         while (true) {
             System.out.println(
                 "Please enter the location of the pack file:"
             );
+
+            if (!scanner.hasNextLine()) {
+                throw new EOFException();
+            }
 
             String filename = scanner.nextLine().trim();
 
