@@ -11,6 +11,10 @@ public class CardGame {
     private final List<Player> players = new ArrayList<>();
     private final List<CardDeck> decks = new ArrayList<>();
     private int winningPlayer = 0;
+    private final List<Thread> playerThreads = new ArrayList<>();
+    private int initialHandsChecked = 0;
+    private boolean stopping = false;
+    private RuntimeException playerFailure;
 
     private CardGame(int numberOfPlayers, List<Card> pack) {
         for (int i = 0; i < numberOfPlayers; i++) {
@@ -45,16 +49,20 @@ public class CardGame {
     public static void main(String[] args) {
         try (Scanner scanner = new Scanner(System.in)) {
             int numberOfPlayers = readPlayerCount(scanner);
-            List<Card> pack = requestPack(scanner, numberOfPlayers); 
+            List<Card> pack = requestPack(scanner, numberOfPlayers);
 
             CardGame game = new CardGame(numberOfPlayers, pack);
 
-            System.out.println(
-                "Setup complete: " + game.players.size()
-                + " players and " + game.decks.size() + " decks."
-            );
+            game.play();
         } catch (EOFException e) {
             System.out.println("Input closed. Exiting.");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            System.out.println("Game interrupted. All players have stopped.");
+        } catch (IOException e) {
+            System.err.println("Cannot write deck output: " + e.getMessage());
+        } catch (IllegalStateException e) {
+            System.err.println("Game stopped: " + e.getMessage());
         }
     }
 
@@ -141,29 +149,156 @@ public class CardGame {
         return pack;
     }
 
-public int getWinner() {
-    synchronized (gameLock) {
-        return winningPlayer;
-    }
-}
+    private void play() throws InterruptedException, IOException {
+        for (Player player : players) {
+            Thread thread = new Thread(
+                () -> runPlayer(player),
+                "player" + player.getPlayerNumber()
+            );
+            playerThreads.add(thread);
+        }
 
-public boolean declareWinner(int playerNumber) {
-    synchronized (gameLock) {
-        if (playerNumber < 1 || playerNumber > players.size()) {
-            throw new IllegalArgumentException(
-                "Invalid player number"
+        for (Thread thread : playerThreads) {
+            thread.start();
+        }
+
+        waitForPlayers();
+
+        if (playerFailure != null) {
+            throw new IllegalStateException(
+                "A player failed: " + playerFailure.getMessage(),
+                playerFailure
             );
         }
 
-        if (winningPlayer != 0) {
-            return false;
+        writeDeckFiles();
+    }
+
+    private void runPlayer(Player player) {
+        try {
+            synchronized (gameLock) {
+                if (player.hasWinningHand()
+                        && declareWinner(player.getPlayerNumber())) {
+                    System.out.println(
+                        "player " + player.getPlayerNumber() + " wins"
+                    );
+                }
+
+                initialHandsChecked++;
+                gameLock.notifyAll();
+
+                // No ordinary moves until every starting hand is checked.
+                while (initialHandsChecked < players.size()
+                        && winningPlayer == 0 && !stopping) {
+                    gameLock.wait();
+                }
+            }
+
+            while (true) {
+                synchronized (gameLock) {
+                    if (winningPlayer != 0 || stopping) {
+                        return;
+                    }
+
+                    if (!player.takeTurn()) {
+                        // Waiting releases the lock so other players can move.
+                        gameLock.wait();
+                        continue;
+                    }
+
+                    if (player.hasWinningHand()
+                            && declareWinner(player.getPlayerNumber())) {
+                        System.out.println(
+                            "player " + player.getPlayerNumber() + " wins"
+                        );
+                    }
+
+                    // A discard may allow a player with an empty deck to move.
+                    gameLock.notifyAll();
+                }
+            }
+        } catch (InterruptedException e) {
+            stopGame();
+            Thread.currentThread().interrupt();
+        } catch (RuntimeException e) {
+            synchronized (gameLock) {
+                if (playerFailure == null) {
+                    playerFailure = e;
+                }
+                stopGame();
+            }
+        }
+    }
+
+    private void waitForPlayers() throws InterruptedException {
+        boolean interrupted = false;
+
+        // Join outside gameLock: players need that lock to finish.
+        for (Thread thread : playerThreads) {
+            while (thread.isAlive()) {
+                try {
+                    thread.join();
+                } catch (InterruptedException e) {
+                    interrupted = true;
+                    stopGame();
+                    for (Thread playerThread : playerThreads) {
+                        playerThread.interrupt();
+                    }
+                }
+            }
         }
 
-        winningPlayer = playerNumber;
-        gameLock.notifyAll();
-
-        return true;
+        if (interrupted) {
+            Thread.currentThread().interrupt();
+            throw new InterruptedException("Game interrupted");
+        }
     }
-}
 
+    private void stopGame() {
+        synchronized (gameLock) {
+            stopping = true;
+            gameLock.notifyAll();
+        }
+    }
+
+    private void writeDeckFiles() throws IOException {
+        for (CardDeck deck : decks) {
+            StringBuilder contents = new StringBuilder(
+                "deck" + deck.getDeckNumber() + " contents:"
+            );
+
+            for (Card card : deck.getContents()) {
+                contents.append(' ').append(card.getDenomination());
+            }
+
+            Path output = Path.of(
+                "deck" + deck.getDeckNumber() + "_output.txt"
+            );
+            Files.writeString(output, contents + System.lineSeparator());
+        }
+    }
+
+    public int getWinner() {
+        synchronized (gameLock) {
+            return winningPlayer;
+        }
+    }
+
+    public boolean declareWinner(int playerNumber) {
+        synchronized (gameLock) {
+            if (playerNumber < 1 || playerNumber > players.size()) {
+                throw new IllegalArgumentException(
+                    "Invalid player number"
+                );
+            }
+
+            if (winningPlayer != 0 || stopping) {
+                return false;
+            }
+
+            winningPlayer = playerNumber;
+            gameLock.notifyAll();
+            return true;
+        }
+    }
 }
