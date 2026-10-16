@@ -60,7 +60,7 @@ public class CardGame {
             Thread.currentThread().interrupt();
             System.out.println("Game interrupted. All players have stopped.");
         } catch (IOException e) {
-            System.err.println("Cannot write deck output: " + e.getMessage());
+            System.err.println("Cannot write game output: " + e.getMessage());
         } catch (IllegalStateException e) {
             System.err.println("Game stopped: " + e.getMessage());
         }
@@ -83,7 +83,6 @@ public class CardGame {
                     return number;
                 }
             } catch (NumberFormatException e) {
-                // Invalid text falls through to the message below.
             }
 
             System.out.println("Please enter a positive whole number.");
@@ -151,6 +150,10 @@ public class CardGame {
 
     private void play() throws InterruptedException, IOException {
         for (Player player : players) {
+            player.writeInitialHand();
+        }
+
+        for (Player player : players) {
             Thread thread = new Thread(
                 () -> runPlayer(player),
                 "player" + player.getPlayerNumber()
@@ -171,6 +174,10 @@ public class CardGame {
             );
         }
 
+        for (Player player : players) {
+            player.writeFinalHand(getWinner());
+        }
+
         writeDeckFiles();
     }
 
@@ -187,7 +194,6 @@ public class CardGame {
                 initialHandsChecked++;
                 gameLock.notifyAll();
 
-                // No ordinary moves until every starting hand is checked.
                 while (initialHandsChecked < players.size()
                         && winningPlayer == 0 && !stopping) {
                     gameLock.wait();
@@ -201,7 +207,6 @@ public class CardGame {
                     }
 
                     if (!player.takeTurn()) {
-                        // Waiting releases the lock so other players can move.
                         gameLock.wait();
                         continue;
                     }
@@ -213,7 +218,6 @@ public class CardGame {
                         );
                     }
 
-                    // A discard may allow a player with an empty deck to move.
                     gameLock.notifyAll();
                 }
             }
@@ -233,7 +237,6 @@ public class CardGame {
     private void waitForPlayers() throws InterruptedException {
         boolean interrupted = false;
 
-        // Join outside gameLock: players need that lock to finish.
         for (Thread thread : playerThreads) {
             while (thread.isAlive()) {
                 try {
