@@ -9,6 +9,7 @@ public class CardGame {
     private final Object gameLock = new Object();
     private final List<Player> players = new ArrayList<>();
     private final List<CardDeck> decks = new ArrayList<>();
+    private int winningPlayer = 0;
 
     private CardGame(int numberOfPlayers, List<Card> pack) {
         for (int i = 0; i < numberOfPlayers; i++) {
@@ -35,7 +36,7 @@ public class CardGame {
     public static void main(String[] args) {
         try (Scanner scanner = new Scanner(System.in)) {
             int numberOfPlayers = readPlayerCount(scanner);
-            List<Card> pack = requestPack(scanner, numberOfPlayers);
+            List<Card> pack = requestPack(scanner, numberOfPlayers); 
 
             CardGame game = new CardGame(numberOfPlayers, pack);
 
@@ -120,4 +121,30 @@ public class CardGame {
 
         return pack;
     }
+
+public int getWinner() {
+    synchronized (gameLock) {
+        return winningPlayer;
+    }
+}
+
+public boolean declareWinner(int playerNumber) {
+    synchronized (gameLock) {
+        if (playerNumber < 1 || playerNumber > players.size()) {
+            throw new IllegalArgumentException(
+                "Invalid player number"
+            );
+        }
+
+        if (winningPlayer != 0) {
+            return false;
+        }
+
+        winningPlayer = playerNumber;
+        gameLock.notifyAll();
+
+        return true;
+    }
+}
+
 }
