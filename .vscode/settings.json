@@ -1,0 +1,10 @@
+{
+    "java.project.sourcePaths": [
+        "card-game/src",
+        "card-game/test"
+    ],
+    "java.project.referencedLibraries": [
+        "card-game/lib/junit-platform-console-standalone-1.14.4.jar"
+    ],
+    "java.project.outputPath": "card-game/build"
+}
