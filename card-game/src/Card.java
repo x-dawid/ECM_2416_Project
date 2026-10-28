@@ -13,11 +13,4 @@ public class Card {
     public int getDenomination() {
         return denomination;
     }
-    //main method to just test the functionality of denomination
-    public static void main(String[] args) {
-    Card card = new Card(4);
-    System.out.println(card.getDenomination());
-    }
 }
-
-    
