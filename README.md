@@ -4,13 +4,20 @@ Each player will be run on a thread of their own, drawing and discard cards unti
 
 ## Requirements
 - JDK 21
-- JUnit 5 (included in project)
+- JUnit 5.14.4 (included in project)
 
 Check if java is available
 
 ```sh
 java -version
 javac -version
+```
+
+## Run the cards.jar file
+Open a terminal in the folder that contains the `cards.jar`, then run
+
+```sh
+java -jar cards.jar
 ```
 
 ## Project structure
